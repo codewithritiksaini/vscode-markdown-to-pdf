@@ -1,0 +1,159 @@
+/* =============================================================================
+   preview.css  –  Webview layout: scrollable content + sticky action bar
+   ============================================================================= */
+
+/* ---- CSS Custom Properties ---- */
+:root {
+  --bar-height: 60px;
+  --bar-bg: var(--vscode-sideBar-background, #1e1e2e);
+  --bar-border: var(--vscode-widget-border, #3a3a4a);
+  --btn-bg: #6366f1;
+  --btn-bg-hover: #4f46e5;
+  --btn-fg: #ffffff;
+  --btn-disabled-bg: #4b5563;
+  --btn-disabled-fg: #9ca3af;
+  --status-fg: var(--vscode-descriptionForeground, #9ca3af);
+  --error-fg: #f87171;
+  --success-fg: #34d399;
+  --content-max-width: 860px;
+  --spinner-size: 18px;
+}
+
+/* ---- Reset ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden; /* body itself doesn't scroll; #content does */
+  font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-size: var(--vscode-font-size, 14px);
+  background: var(--vscode-editor-background, #ffffff);
+  color: var(--vscode-editor-foreground, #1a202c);
+}
+
+/* ---- Scrollable Content Area ---- */
+#content {
+  height: calc(100vh - var(--bar-height));
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2.5rem 2rem;
+  scroll-behavior: smooth;
+}
+
+/* Centre and constrain content width */
+.markdown-body {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+}
+
+/* ---- Action Bar (fixed at bottom) ---- */
+.action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--bar-height);
+  background: var(--bar-bg);
+  border-top: 1px solid var(--bar-border);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.action-bar-inner {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* ---- Status Text ---- */
+.status-text {
+  font-size: 0.8125rem;
+  color: var(--status-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  transition: color 0.3s ease;
+}
+.status-text.error  { color: var(--error-fg); }
+.status-text.success { color: var(--success-fg); }
+
+/* ---- Download Button ---- */
+.btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 1.1rem;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+  outline-offset: 2px;
+  flex-shrink: 0;
+}
+
+.btn-download:hover:not(:disabled) {
+  background: var(--btn-bg-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.5);
+}
+
+.btn-download:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+}
+
+.btn-download:focus-visible {
+  outline: 2px solid #6366f1;
+}
+
+.btn-download:disabled {
+  background: var(--btn-disabled-bg);
+  color: var(--btn-disabled-fg);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ---- Spinner ---- */
+.spinner {
+  display: inline-block;
+  width: var(--spinner-size);
+  height: var(--spinner-size);
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner.hidden { display: none; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Scrollbar styling ---- */
+#content::-webkit-scrollbar { width: 6px; }
+#content::-webkit-scrollbar-track { background: transparent; }
+#content::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-background, rgba(120,120,120,0.4));
+  border-radius: 3px;
+}
+#content::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground, rgba(120,120,120,0.7));
+}

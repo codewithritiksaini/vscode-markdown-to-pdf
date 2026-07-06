@@ -1,0 +1,161 @@
+{
+  "name": "markdown-to-pdf",
+  "displayName": "Markdown Preview in Browser",
+  "description": "Open any Markdown file as a beautifully styled HTML preview in your browser — with Google Fonts, card layout, and Print to PDF support.",
+  "version": "1.1.0",
+  "publisher": "codewithritiksaini",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Formatters"
+  ],
+  "keywords": [
+    "markdown",
+    "pdf",
+    "preview",
+    "export",
+    "convert"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "markdownPdf.openInBrowser",
+        "title": "Open Markdown Preview in Browser",
+        "category": "Markdown PDF",
+        "icon": "$(globe)"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "markdownPdf.openInBrowser",
+          "when": "resourceExtname == .md",
+          "group": "navigation@100"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "markdownPdf.openInBrowser",
+          "when": "resourceExtname == .md",
+          "group": "navigation@100"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "markdownPdf.openInBrowser",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "markdownPdf.openInBrowser"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Markdown PDF",
+      "properties": {
+        "markdownPdf.pageSize": {
+          "type": "string",
+          "default": "A4",
+          "enum": [
+            "A4",
+            "Letter",
+            "Legal",
+            "Tabloid",
+            "A3",
+            "A5"
+          ],
+          "description": "Page size for the generated PDF."
+        },
+        "markdownPdf.margins": {
+          "type": "object",
+          "default": {
+            "top": "20mm",
+            "bottom": "20mm",
+            "left": "15mm",
+            "right": "15mm"
+          },
+          "properties": {
+            "top": {
+              "type": "string",
+              "description": "Top margin (e.g. 20mm, 1in)"
+            },
+            "bottom": {
+              "type": "string",
+              "description": "Bottom margin"
+            },
+            "left": {
+              "type": "string",
+              "description": "Left margin"
+            },
+            "right": {
+              "type": "string",
+              "description": "Right margin"
+            }
+          },
+          "description": "Page margins for the generated PDF."
+        },
+        "markdownPdf.customCSSPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to a custom CSS file to inject into the PDF."
+        },
+        "markdownPdf.includeHeaderFooter": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include header (filename) and footer (page numbers) in the PDF."
+        },
+        "markdownPdf.highlightTheme": {
+          "type": "string",
+          "default": "github",
+          "enum": [
+            "github",
+            "monokai",
+            "dracula",
+            "solarized-light",
+            "atom-one-dark"
+          ],
+          "description": "Syntax highlight theme for code blocks."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "node build.js --production",
+    "compile": "node build.js",
+    "compile:tsc": "tsc -p ./ --noEmit",
+    "watch": "node build.js --watch",
+    "lint": "eslint src --ext ts",
+    "package": "npx vsce package --no-dependencies",
+    "pretest": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.27.3",
+    "eslint": "^8.57.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0",
+    "markdown-it-anchor": "^9.2.0",
+    "markdown-it-task-lists": "^2.1.1"
+  },
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ]
+}
