@@ -15,6 +15,8 @@ import { configService } from './configService';
 import { logger } from './logger';
 import { MarkdownDocument } from './types';
 import { bootstrapContainer } from './services/bootstrap';
+import { PreviewService } from './services/PreviewService';
+import { BrowserSocketTransport } from './transports/BrowserSocketTransport';
 
 // ---------------------------------------------------------------------------
 
@@ -46,7 +48,144 @@ export function activate(context: vscode.ExtensionContext): void {
         },
     );
 
+    // Watch Markdown document changes for Live Preview
+    const changeDocSubscription = vscode.workspace.onDidChangeTextDocument(async (event) => {
+        if (event.document.languageId !== 'markdown') {
+            return;
+        }
+        if (event.contentChanges.length === 0) {
+            return;
+        }
+
+        try {
+            const doc = await buildMarkdownDocument(event.document.uri);
+            const previewService = container.get<PreviewService>('PreviewService');
+            await previewService.updatePreview(doc);
+        } catch (err) {
+            logger.error('Failed to trigger live preview update.', err);
+        }
+    });
+
+    // Helper to refresh active live previews targeting only affected sessions
+    const refreshActivePreviews = async (changedUri?: vscode.Uri, force: boolean = false) => {
+        try {
+            const previewService = container.get<PreviewService>('PreviewService');
+            const openDocs = vscode.workspace.textDocuments.filter((d) => d.languageId === 'markdown');
+            for (const doc of openDocs) {
+                const docUri = doc.uri.toString();
+                if (!previewService.transportActive(docUri)) {
+                    continue;
+                }
+
+                let shouldRefresh = false;
+                if (!changedUri) {
+                    // Global trigger (configuration)
+                    shouldRefresh = true;
+                } else {
+                    const changedPath = changedUri.fsPath;
+                    const ext = path.extname(changedPath).toLowerCase();
+
+                    if (ext === '.md') {
+                        shouldRefresh = (doc.uri.toString() === changedUri.toString());
+                    } else if (['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.avif'].includes(ext)) {
+                        const imgName = path.basename(changedPath);
+                        shouldRefresh = doc.getText().includes(imgName);
+                    } else if (ext === '.css' || ext === '.html') {
+                        const docFolder = vscode.workspace.getWorkspaceFolder(doc.uri);
+                        const changedFolder = vscode.workspace.getWorkspaceFolder(changedUri);
+                        if (docFolder && changedFolder) {
+                            shouldRefresh = (docFolder.uri.toString() === changedFolder.uri.toString());
+                        } else {
+                            shouldRefresh = true;
+                        }
+                    }
+                }
+
+                if (shouldRefresh) {
+                    const markdownDoc = await buildMarkdownDocument(doc.uri);
+                    await previewService.updatePreview(markdownDoc, force);
+                }
+            }
+        } catch (err) {
+            logger.error('Failed to refresh active previews.', err);
+        }
+    };
+
+    // Watch configuration changes
+    const changeConfigSubscription = vscode.workspace.onDidChangeConfiguration(async (event) => {
+        if (event.affectsConfiguration('markdownPdf')) {
+            await refreshActivePreviews(undefined, true);
+        }
+    });
+
+    // Dedicated file system watchers for images
+    const imageWatcher = vscode.workspace.createFileSystemWatcher('**/*.{png,jpg,jpeg,gif,svg,webp,avif}');
+    imageWatcher.onDidChange((uri) => refreshActivePreviews(uri, true));
+    imageWatcher.onDidCreate((uri) => refreshActivePreviews(uri, true));
+    imageWatcher.onDidDelete((uri) => refreshActivePreviews(uri, true));
+
+    // Watch closed documents to clean up preview session state
+    const closeDocSubscription = vscode.workspace.onDidCloseTextDocument((document) => {
+        if (document.languageId !== 'markdown') {
+            return;
+        }
+        try {
+            const docUri = document.uri.toString();
+            const previewService = container.get<PreviewService>('PreviewService');
+            previewService.closePreviewSession(docUri);
+        } catch (err) {
+            logger.error('Failed to clean up closed preview session.', err);
+        }
+    });
+
+    // Watch custom CSS file changes specifically (including those outside workspace)
+    const watchCustomCSS = () => {
+        const getCustomCssPath = () => {
+            const rawPath = vscode.workspace.getConfiguration('markdownPdf').get<string>('customCSSPath') || '';
+            if (!rawPath.trim()) return '';
+            if (path.isAbsolute(rawPath)) return rawPath;
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (workspaceFolders && workspaceFolders.length > 0) {
+                return path.resolve(workspaceFolders[0].uri.fsPath, rawPath);
+            }
+            return '';
+        };
+        let currentPath = getCustomCssPath();
+        let watcher: vscode.FileSystemWatcher | null = null;
+
+        const rebuildWatcher = () => {
+            if (watcher) {
+                watcher.dispose();
+                watcher = null;
+            }
+            if (currentPath) {
+                watcher = vscode.workspace.createFileSystemWatcher(currentPath);
+                watcher.onDidChange((uri) => refreshActivePreviews(uri, true));
+                watcher.onDidCreate((uri) => refreshActivePreviews(uri, true));
+                watcher.onDidDelete((uri) => refreshActivePreviews(uri, true));
+            }
+        };
+
+        rebuildWatcher();
+
+        // Listen to config changes to rebuild custom CSS watcher if path changes
+        const configSub = vscode.workspace.onDidChangeConfiguration((e) => {
+            if (e.affectsConfiguration('markdownPdf.customCSSPath')) {
+                currentPath = getCustomCssPath();
+                rebuildWatcher();
+            }
+        });
+        context.subscriptions.push(configSub);
+        context.subscriptions.push(new vscode.Disposable(() => watcher?.dispose()));
+    };
+
+    watchCustomCSS();
+
     context.subscriptions.push(openInBrowserCmd);
+    context.subscriptions.push(changeDocSubscription);
+    context.subscriptions.push(changeConfigSubscription);
+    context.subscriptions.push(closeDocSubscription);
+    context.subscriptions.push(imageWatcher);
     context.subscriptions.push(configService);
 
     logger.info('Markdown PDF extension activated successfully.');
@@ -54,6 +193,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export async function deactivate(): Promise<void> {
     logger.info('Markdown PDF extension deactivating…');
+    await BrowserSocketTransport.shutdown();
     previewProvider?.dispose();
     logger.dispose();
 }

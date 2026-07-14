@@ -12,6 +12,7 @@ import { BrowserLauncher, BrowserLauncherStep } from './BrowserLauncher';
 import { PreviewService } from './PreviewService';
 import { DefaultRenderingEngine } from '../core/RenderingEngine';
 import { BrowserFileTransport } from '../transports/BrowserFileTransport';
+import { BrowserSocketTransport } from '../transports/BrowserSocketTransport';
 import { logger } from '../logger';
 
 /**
@@ -75,18 +76,20 @@ export function bootstrapContainer(extensionPath: string): ServiceContainer {
     assetResolver.registerPlugin(new LocalImageAssetResolver());
     const templateStep   = new TemplateStep(new DefaultTemplateEngine(defaultHtmlPath, defaultCssPath));
 
-    // 5. Construct transport-layer steps (used by BrowserFileTransport)
+    // 5. Construct transport-layer steps
     const fileManagerStep = new TempFileManagerStep(new TempFileManager());
-    const launcherStep    = new BrowserLauncherStep(new BrowserLauncher());
+    const browserLauncher = new BrowserLauncher();
+    const launcherStep    = new BrowserLauncherStep(browserLauncher);
 
     // 6. Assemble the Rendering Engine (pure in-memory: Markdown → HTML fragment → wrapped page)
     const renderingEngine = new DefaultRenderingEngine(renderer, assetResolver, templateStep);
 
-    // 7. Assemble the Transport (BrowserFileTransport: writes temp file + opens browser)
-    const transport = new BrowserFileTransport(fileManagerStep, launcherStep);
+    // 7. Assemble the Transports
+    const transport = new BrowserSocketTransport(browserLauncher, extensionPath);
+    const fallbackTransport = new BrowserFileTransport(fileManagerStep, launcherStep);
 
     // 8. Register the coordinator service (depends only on abstract interfaces)
-    container.register('PreviewService', new PreviewService(renderingEngine, transport, eventBus));
+    container.register('PreviewService', new PreviewService(renderingEngine, transport, fallbackTransport, eventBus));
 
     return container;
 }

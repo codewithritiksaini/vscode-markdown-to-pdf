@@ -14,7 +14,9 @@ export class BrowserLauncherStep implements PipelineStep<GeneratedFile, BrowserL
 export class BrowserLauncher {
     launch(filePath: string): Promise<void> {
         return new Promise((resolve, reject) => {
-            const fileUrl = `file://${filePath}`;
+            const fileUrl = (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('file://'))
+                ? filePath
+                : `file://${filePath}`;
 
             if (process.platform === 'darwin') {
                 exec(`open "${fileUrl}"`, (err) => err ? reject(err) : resolve());
@@ -46,7 +48,7 @@ export class BrowserLauncher {
                 }
 
                 const browser = browsers[index];
-                const cmd = `${browser} "${fileUrl}"`;
+                const cmd = `${browser} "${fileUrl}" &`;
 
                 exec(cmd, { env }, (err) => {
                     if (err) {
