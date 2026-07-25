@@ -1,4 +1,4 @@
-# Markdown Preview in Browser – VS Code Extension
+# Markdown Live Preview in Browser & PDF – VS Code Extension
 
 Open any `.md` file as a beautifully styled HTML preview right in your browser! With premium typography, mac OS-style code blocks, and native "Print to PDF" support.
 
