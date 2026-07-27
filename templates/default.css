@@ -127,6 +127,8 @@ hr { height:2px; background:linear-gradient(90deg,var(--accent),transparent);
   html,body { background:#fff; padding:0; }
   .print-bar,.page-header { display:none; }
   .card { border:none; box-shadow:none; padding:0; }
-  pre { box-shadow:none; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  pre { box-shadow:none; -webkit-print-color-adjust:exact; print-color-adjust:exact;
+        overflow-x:visible; white-space:pre-wrap; word-break:break-word; max-width:100%; }
+  table { overflow-x:visible; display:block; max-width:100%; }
   h1 { -webkit-text-fill-color:#1f2328; background:none; }
 }

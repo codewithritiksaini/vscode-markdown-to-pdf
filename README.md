@@ -1,77 +1,82 @@
-# Markdown Live Preview in Browser & PDF – VS Code Extension
+# Markdown Preview in Browser
 
-Open any `.md` file as a beautifully styled HTML preview right in your browser! With premium typography, mac OS-style code blocks, and native "Print to PDF" support.
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/codewithritiksaini/vscode-markdown-to-pdf)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/codewithritiksaini/vscode-markdown-to-pdf/blob/main/LICENSE)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-codewithritiksaini%2Fvscode--markdown--to--pdf-181717.svg?logo=github)](https://github.com/codewithritiksaini/vscode-markdown-to-pdf)
 
----
-
-## Features
-
-| Feature | Details |
-|---|---|
-| **Beautiful Typography** | Uses Google Fonts (Inter, JetBrains Mono) |
-| **Browser Native** | Opens instantly in your default browser (Chrome, Firefox, etc.) |
-| **Print to PDF** | Use your browser's native `Ctrl+P` → Save as PDF for pixel-perfect exports |
-| **macOS Code Blocks** | Premium code blocks featuring traffic light dots (🔴🟡🟢) |
-| **Lightweight** | No heavy dependencies (Puppeteer removed!) – bundle size is under 250KB |
-| **Auto Cleanup** | Temporary preview files auto-delete themselves after 30 seconds |
+Open any Markdown (`.md`) file as a beautifully styled, dynamic HTML live preview in your default web browser — featuring Google Fonts, card layouts, real-time WebSocket sync, and pixel-perfect **Print to PDF** support.
 
 ---
 
-## Usage
+## ✨ Features
 
-### Context Menu (Recommended)
-1. Right-click any `.md` file in the **Explorer** panel
-2. Choose **"Open Markdown Preview in Browser"**
-3. Your default browser will open with a styled preview!
-4. To save as PDF, just press `Ctrl+P` (or `Cmd+P`) in the browser and choose **Save as PDF** ✅
-
-### Command Palette
-1. Open a `.md` file in the editor
-2. Press `Ctrl+Shift+P` → type **"Open Markdown Preview in Browser"**
+- ⚡ **Real-Time Live Preview**: Instant WebSocket synchronization as you type in VS Code with smart DOM morphing (preserves scroll positions and media states).
+- 🎨 **Modern Card Layout & Typography**: Designed with Inter and JetBrains Mono fonts, smooth gradients, and GitHub-flavored formatting.
+- 🖨️ **Print & Export to PDF**: Native browser `window.print()` support with dedicated print styling — long code blocks and tables wrap neatly without getting clipped.
+- 💻 **macOS-Style Code Blocks**: Dark themed code blocks with traffic light window controls (🔴🟡🟢) and syntax highlighting support.
+- 🖼️ **Local Image Inlining**: Automatic Base64 inlining for local image paths, ensuring your preview and exported PDFs load images safely anywhere.
+- ⚙️ **Custom CSS Support**: Inject your own custom stylesheets to personalize preview output.
+- 🪶 **Ultra Lightweight**: Pure esbuild bundle under 250KB with zero heavy headless browser (Puppeteer) dependencies.
 
 ---
 
-## Installation
+## 🚀 Quick Start & Usage
 
-### From VSIX (recommended during development)
+### 1. Context Menu (Explorer or Editor)
+- Right-click any `.md` file in the **Explorer** panel or **Editor context menu**.
+- Click **"Open Markdown Preview in Browser"** (or click the 🌐 globe icon in the editor title bar).
+
+### 2. Command Palette
+1. Open any `.md` file in VS Code.
+2. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS).
+3. Type and select **"Open Markdown Preview in Browser"**.
+
+### 3. Print to PDF
+- Click the **"Print / Save as PDF"** button at the bottom-right of the browser preview window, or press `Ctrl+P` / `Cmd+P` to save as a PDF.
+
+---
+
+## ⚙️ Configuration
+
+Customize the extension settings under `Settings` → `Extensions` → `Markdown PDF` or in your `settings.json`:
+
+| Setting | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `markdownPdf.pageSize` | `string` | `"A4"` | Page size for PDF output (`A4`, `Letter`, `Legal`, `Tabloid`, `A3`, `A5`). |
+| `markdownPdf.margins` | `object` | `{ top: "20mm", bottom: "20mm", left: "15mm", right: "15mm" }` | Page margins for PDF generation. |
+| `markdownPdf.customCSSPath` | `string` | `""` | Absolute path or workspace-relative path to a custom `.css` file. |
+| `markdownPdf.includeHeaderFooter` | `boolean` | `true` | Include document headers and footers. |
+| `markdownPdf.highlightTheme` | `string` | `"github"` | Code block syntax highlighting theme. |
+
+---
+
+## 📦 Installation
+
+### Install from `.vsix` Package
 
 ```bash
-# 1. Install dependencies
-npm install
-
-# 2. Compile and package using esbuild & vsce
+# Package extension into .vsix
 npm run package
-# → produces markdown-to-pdf-1.1.0.vsix
 
-# 3a. Install in VS Code
+# Install in VS Code
 code --install-extension markdown-to-pdf-1.1.0.vsix
 
-# 3b. Install in Antigravity / Cursor / Windsurf
+# Install in Antigravity / Cursor / Windsurf
 antigravity --install-extension markdown-to-pdf-1.1.0.vsix
 ```
 
-### From Marketplace (once published)
-Search **"Markdown Preview in Browser"** by `codewithritiksaini` in the Extensions panel.
+---
+
+## 🔗 Repository & Community
+
+- **GitHub Repository**: [codewithritiksaini/vscode-markdown-to-pdf](https://github.com/codewithritiksaini/vscode-markdown-to-pdf)
+- **Issue Tracker**: [Report a Bug / Feature Request](https://github.com/codewithritiksaini/vscode-markdown-to-pdf/issues)
+- **Changelog**: See [CHANGELOG.md](https://github.com/codewithritiksaini/vscode-markdown-to-pdf/blob/main/CHANGELOG.md) for version updates.
 
 ---
 
-## Technical Details & Architecture
+## 📄 License
 
-- **Zero-config PDF generation**: By relying on the browser's native print engine, you get 100% accurate CSS rendering and crisp PDFs without bundling heavy headless browsers.
-- **esbuild integration**: Dependencies are bundled seamlessly for maximum performance in all environments (including extension hosts that restrict node_modules).
-- **Graceful File Cleanup**: `fs.unlink` automatically cleans up the generated `/tmp/md-preview-xxx.html` files 30 seconds after they open.
+Distributed under the MIT License. See [LICENSE](https://github.com/codewithritiksaini/vscode-markdown-to-pdf/blob/main/LICENSE) for more details.
 
-```text
-src/
-  extension.ts        – Activation, command registration, lifecycle
-  previewProvider.ts  – HTML generation via markdown-it, browser launch via target child_process
-  markdownService.ts  – markdown-it: GFM, task lists, image inlining
-  configService.ts    – Setup and settings reader
-  logger.ts           – OutputChannel wrapper
-```
-
----
-
-## License
-
-MIT © codewithritiksaini
+Developed with ❤️ by [codewithritiksaini](https://github.com/codewithritiksaini).
