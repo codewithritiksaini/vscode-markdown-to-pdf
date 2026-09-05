@@ -63,6 +63,9 @@ Go to `Settings` → `Extensions` → `Markdown PDF`, or edit `settings.json`:
 ```bash
 # Install in VS Code
 code --install-extension markdown-to-pdf-1.2.0.vsix
+
+# Install in Antigravity IDE
+antigravity --install-extension markdown-to-pdf-1.2.0.vsix
 ```
 
 Or: **Extensions panel** → `···` menu → **Install from VSIX…**
