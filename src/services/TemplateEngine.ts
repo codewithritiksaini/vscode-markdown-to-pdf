@@ -17,7 +17,7 @@ function escapeHtml(str: string): string {
 }
 
 export class TemplateStep implements PipelineStep<ResolvedAssetsDocument, GeneratedHtml> {
-    constructor(private readonly engine: TemplateEngine) {}
+    constructor(private readonly engine: TemplateEngine) { }
 
     async execute(input: ResolvedAssetsDocument): Promise<GeneratedHtml> {
         const customCSS = await configService.getCustomCSSContent();
@@ -34,7 +34,7 @@ export class DefaultTemplateEngine implements TemplateEngine {
     constructor(
         private readonly htmlTemplatePath: string,
         private readonly cssTemplatePath: string
-    ) {}
+    ) { }
 
     private async getTemplates(): Promise<{ htmlTemplate: string; cssTemplate: string }> {
         if (!this.cachedHtmlTemplate) {
@@ -49,9 +49,19 @@ export class DefaultTemplateEngine implements TemplateEngine {
         };
     }
 
+    /** Wrap every bare &lt;table&gt; in a scroll container div (screen: scroll, print: fixed layout). */
+    private wrapTables(html: string): string {
+        // Avoid double-wrapping if somehow already wrapped
+        return html.replace(
+            /(?<!<div class="table-wrapper">[\s\S]{0,5})(<table[\s\S]*?<\/table>)/g,
+            '<div class="table-wrapper">$1</div>'
+        );
+    }
+
     async build(bodyHtml: string, title: string, customCSS: string): Promise<string> {
         const { htmlTemplate, cssTemplate } = await this.getTemplates();
         const safeTitle = escapeHtml(title);
+        const wrappedBody = this.wrapTables(bodyHtml);
 
         const config = configService.get();
         const themeCss = getHighlightThemeCss(config.highlightTheme);
@@ -77,6 +87,6 @@ ${themeCss}
             .replace(/\{\{TITLE\}\}/g, () => safeTitle)
             .replace(/\{\{STYLE\}\}/g, () => combinedStyle)
             .replace(/\{\{CUSTOM_CSS\}\}/g, () => customCSS)
-            .replace(/\{\{BODY\}\}/g, () => bodyHtml);
+            .replace(/\{\{BODY\}\}/g, () => wrappedBody);
     }
 }
