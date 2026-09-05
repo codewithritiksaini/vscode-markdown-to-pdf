@@ -28,14 +28,29 @@ export class TemplateStep implements PipelineStep<ResolvedAssetsDocument, Genera
 }
 
 export class DefaultTemplateEngine implements TemplateEngine {
+    private cachedHtmlTemplate: string | null = null;
+    private cachedCssTemplate: string | null = null;
+
     constructor(
         private readonly htmlTemplatePath: string,
         private readonly cssTemplatePath: string
     ) {}
 
+    private async getTemplates(): Promise<{ htmlTemplate: string; cssTemplate: string }> {
+        if (!this.cachedHtmlTemplate) {
+            this.cachedHtmlTemplate = await fs.promises.readFile(this.htmlTemplatePath, 'utf-8');
+        }
+        if (!this.cachedCssTemplate) {
+            this.cachedCssTemplate = await fs.promises.readFile(this.cssTemplatePath, 'utf-8');
+        }
+        return {
+            htmlTemplate: this.cachedHtmlTemplate,
+            cssTemplate: this.cachedCssTemplate,
+        };
+    }
+
     async build(bodyHtml: string, title: string, customCSS: string): Promise<string> {
-        const htmlTemplate = await fs.promises.readFile(this.htmlTemplatePath, 'utf-8');
-        const cssTemplate = await fs.promises.readFile(this.cssTemplatePath, 'utf-8');
+        const { htmlTemplate, cssTemplate } = await this.getTemplates();
         const safeTitle = escapeHtml(title);
 
         const config = configService.get();

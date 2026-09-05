@@ -339,6 +339,78 @@
     }
   }
 
+  function reconcileCardChildren(srcParent, dstParent) {
+    const dstChildren = Array.from(dstParent.childNodes);
+    const srcChildren = Array.from(srcParent.childNodes);
+
+    const dstKeyed = new Map();
+    dstChildren.forEach((node) => {
+      if (node.nodeType === Node.ELEMENT_NODE && node.id) {
+        dstKeyed.set(node.id, node);
+      }
+    });
+
+    let dstIndex = 0;
+    for (let i = 0; i < srcChildren.length; i++) {
+      const srcChild = srcChildren[i];
+      let matchedDst = null;
+
+      if (srcChild.nodeType === Node.ELEMENT_NODE && srcChild.id && dstKeyed.has(srcChild.id)) {
+        matchedDst = dstKeyed.get(srcChild.id);
+      } else {
+        for (let offset = 0; offset <= 3 && (dstIndex + offset) < dstParent.childNodes.length; offset++) {
+          const candidate = dstParent.childNodes[dstIndex + offset];
+          if (candidate.nodeName === srcChild.nodeName && candidate.nodeType === srcChild.nodeType) {
+            matchedDst = candidate;
+            break;
+          }
+        }
+      }
+
+      if (!matchedDst) {
+        const newNode = dstParent.ownerDocument.importNode(srcChild, true);
+        if (dstIndex < dstParent.childNodes.length) {
+          dstParent.insertBefore(newNode, dstParent.childNodes[dstIndex]);
+        } else {
+          dstParent.appendChild(newNode);
+        }
+      } else {
+        if (dstParent.childNodes[dstIndex] !== matchedDst) {
+          dstParent.insertBefore(matchedDst, dstParent.childNodes[dstIndex]);
+        }
+        morph(srcChild, matchedDst);
+      }
+      dstIndex++;
+    }
+
+    while (dstParent.childNodes.length > dstIndex) {
+      dstParent.removeChild(dstParent.lastChild);
+    }
+  }
+
+  function updateConnectionBadge(status, text) {
+    const badge = document.getElementById('connection-status-badge');
+    if (!badge) return;
+    badge.className = 'status-indicator ' + (status === 'connected' ? 'connected' : 'disconnected');
+    const textEl = badge.querySelector('.status-text');
+    if (textEl) {
+      textEl.textContent = text;
+    }
+    if (status === 'disconnected') {
+      badge.style.cursor = 'pointer';
+      badge.title = 'Click to reconnect';
+      badge.onclick = function() {
+        retryCount = 0;
+        reconnectDelay = 1000;
+        connect();
+      };
+    } else {
+      badge.style.cursor = 'default';
+      badge.title = 'Live sync active';
+      badge.onclick = null;
+    }
+  }
+
   function connect() {
     socket = new WebSocket(wsUri);
     socket.onopen = function() {
@@ -346,6 +418,7 @@
       reconnectDelay = 1000;
       retryCount = 0;
       resetHeartbeat();
+      updateConnectionBadge('connected', 'Live Sync');
     };
     socket.onmessage = function(event) {
       const data = JSON.parse(event.data);
@@ -371,24 +444,7 @@
         if (cardEl) {
           const tempDiv = document.createElement('div');
           tempDiv.innerHTML = data.html;
-
-          const srcChildren = Array.from(tempDiv.childNodes);
-          let dstIndex = 0;
-          srcChildren.forEach((srcChild) => {
-            let dstChild = cardEl.childNodes[dstIndex];
-            if (!dstChild) {
-              cardEl.appendChild(cardEl.ownerDocument.importNode(srcChild, true));
-            } else if (srcChild.nodeName !== dstChild.nodeName || srcChild.nodeType !== dstChild.nodeType) {
-              cardEl.replaceChild(cardEl.ownerDocument.importNode(srcChild, true), dstChild);
-            } else {
-              morph(srcChild, dstChild);
-            }
-            dstIndex++;
-          });
-
-          while (cardEl.childNodes.length > dstIndex) {
-            cardEl.removeChild(cardEl.lastChild);
-          }
+          reconcileCardChildren(tempDiv, cardEl);
         }
 
         let styleEl = document.getElementById('custom-injected-style');
@@ -406,8 +462,11 @@
       clearTimeout(heartbeatTimeout);
       if (retryCount < maxRetries) {
         retryCount++;
+        updateConnectionBadge('disconnected', 'Reconnecting...');
         setTimeout(connect, reconnectDelay);
         reconnectDelay *= 2;
+      } else {
+        updateConnectionBadge('disconnected', 'Disconnected (Click to reconnect)');
       }
     };
     socket.onerror = function(err) {
