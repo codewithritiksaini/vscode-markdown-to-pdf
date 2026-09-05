@@ -1,6 +1,7 @@
 import * as http from 'http';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Transport } from '../core/Transport';
 import { RenderResult } from '../core/RenderResult';
@@ -22,6 +23,7 @@ export class BrowserSocketTransport implements Transport {
     private static sequenceNumbers = new Map<string, number>();
     private static openedFiles = new Set<string>();
     private static cleanupTimers = new Map<string, NodeJS.Timeout>();
+    private static sessionTokens = new Map<string, string>();
 
     constructor(private readonly launcher: BrowserLauncher, extensionPath: string) {
         BrowserSocketTransport.extensionPath = extensionPath;
@@ -37,6 +39,14 @@ export class BrowserSocketTransport implements Transport {
 
         BrowserSocketTransport.serverStartedPromise = new Promise<number>((resolve, reject) => {
             const server = http.createServer(async (req, res) => {
+                const host = req.headers.host || '';
+                // Host header validation against DNS rebinding
+                if (!host.startsWith('127.0.0.1:') && !host.startsWith('localhost:')) {
+                    res.writeHead(403, { 'Content-Type': 'text/plain' });
+                    res.end('Forbidden');
+                    return;
+                }
+
                 const urlObj = new URL(req.url ?? '', `http://${req.headers.host}`);
 
                 // Serve static JS client script from extension path
@@ -54,9 +64,19 @@ export class BrowserSocketTransport implements Transport {
                 }
 
                 const fileId = urlObj.searchParams.get('file');
+                const token = urlObj.searchParams.get('token');
+
                 if (!fileId) {
                     res.writeHead(400, { 'Content-Type': 'text/plain' });
                     res.end('Missing file parameter');
+                    return;
+                }
+
+                const expectedToken = BrowserSocketTransport.sessionTokens.get(fileId);
+                if (!token || !expectedToken || token !== expectedToken) {
+                    logger.warn(`Security: Rejected HTTP request with invalid session token for ${fileId}`);
+                    res.writeHead(403, { 'Content-Type': 'text/plain' });
+                    res.end('Forbidden: Invalid or missing session token');
                     return;
                 }
 
@@ -78,8 +98,44 @@ export class BrowserSocketTransport implements Transport {
             const wss = new WebSocketServer({ noServer: true });
 
             server.on('upgrade', (request, socket, head) => {
+                const host = request.headers.host || '';
+                if (!host.startsWith('127.0.0.1:') && !host.startsWith('localhost:')) {
+                    socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+                    socket.destroy();
+                    return;
+                }
+
+                // Origin validation: Prevent Cross-Site WebSocket Hijacking (CSWSH)
+                const origin = request.headers.origin;
+                if (origin) {
+                    try {
+                        const originUrl = new URL(origin);
+                        if (originUrl.hostname !== '127.0.0.1' && originUrl.hostname !== 'localhost') {
+                            logger.warn(`Security: Rejected WebSocket upgrade from untrusted origin: ${origin}`);
+                            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+                            socket.destroy();
+                            return;
+                        }
+                    } catch {
+                        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+                        socket.destroy();
+                        return;
+                    }
+                }
+
                 const urlObj = new URL(request.url ?? '', `http://localhost`);
                 if (urlObj.pathname === '/ws') {
+                    const fileId = urlObj.searchParams.get('file');
+                    const token = urlObj.searchParams.get('token');
+                    const expectedToken = BrowserSocketTransport.sessionTokens.get(fileId || '');
+
+                    if (!fileId || !token || !expectedToken || token !== expectedToken) {
+                        logger.warn(`Security: Rejected WebSocket upgrade due to invalid session token`);
+                        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+                        socket.destroy();
+                        return;
+                    }
+
                     wss.handleUpgrade(request, socket, head, (ws) => {
                         wss.emit('connection', ws, request);
                     });
@@ -172,6 +228,7 @@ export class BrowserSocketTransport implements Transport {
                                     BrowserSocketTransport.customCssCache.delete(fileId);
                                     BrowserSocketTransport.openedFiles.delete(fileId);
                                     BrowserSocketTransport.sequenceNumbers.delete(fileId);
+                                    BrowserSocketTransport.sessionTokens.delete(fileId);
                                 }
                             }, 5000);
                             BrowserSocketTransport.cleanupTimers.set(fileId, timer);
@@ -182,6 +239,7 @@ export class BrowserSocketTransport implements Transport {
 
             server.on('error', (err) => {
                 logger.error('Live Preview server error:', err);
+                BrowserSocketTransport.serverStartedPromise = null;
                 reject(err);
             });
 
@@ -197,12 +255,11 @@ export class BrowserSocketTransport implements Transport {
                     wsAny.isAlive = false;
                     try {
                         ws.ping();
-                        ws.send(JSON.stringify({ type: 'ping' }));
                     } catch {
                         ws.terminate();
                     }
                 });
-            }, 10000);
+            }, 15000);
 
             // Ephemeral port selection
             server.listen(0, '127.0.0.1', () => {
@@ -225,7 +282,12 @@ export class BrowserSocketTransport implements Transport {
     async send(result: RenderResult): Promise<void> {
         const fileId = result.document.uri.toString();
 
-        // 1. Update the caches
+        // 1. Update the caches and ensure security token exists
+        if (!BrowserSocketTransport.sessionTokens.has(fileId)) {
+            BrowserSocketTransport.sessionTokens.set(fileId, crypto.randomBytes(16).toString('hex'));
+        }
+        const token = BrowserSocketTransport.sessionTokens.get(fileId)!;
+
         BrowserSocketTransport.htmlCache.set(fileId, result.metadata.htmlContent);
         BrowserSocketTransport.titleCache.set(fileId, result.document.baseName);
         BrowserSocketTransport.customCssCache.set(fileId, result.metadata.customCSS || '');
@@ -259,7 +321,7 @@ export class BrowserSocketTransport implements Transport {
         if (!BrowserSocketTransport.openedFiles.has(fileId)) {
             logger.info(`Preview session created for: ${fileId}`);
             BrowserSocketTransport.openedFiles.add(fileId);
-            const previewUrl = `http://127.0.0.1:${port}/?file=${encodeURIComponent(fileId)}`;
+            const previewUrl = `http://127.0.0.1:${port}/?file=${encodeURIComponent(fileId)}&token=${encodeURIComponent(token)}`;
             await this.launcher.launch(previewUrl);
         }
     }
@@ -294,6 +356,7 @@ export class BrowserSocketTransport implements Transport {
         BrowserSocketTransport.customCssCache.delete(docUri);
         BrowserSocketTransport.openedFiles.delete(docUri);
         BrowserSocketTransport.sequenceNumbers.delete(docUri);
+        BrowserSocketTransport.sessionTokens.delete(docUri);
     }
 
     dispose(): void {
@@ -333,6 +396,7 @@ export class BrowserSocketTransport implements Transport {
             BrowserSocketTransport.customCssCache.clear();
             BrowserSocketTransport.openedFiles.clear();
             BrowserSocketTransport.sequenceNumbers.clear();
+            BrowserSocketTransport.sessionTokens.clear();
             BrowserSocketTransport.serverStartedPromise = null;
 
             if (BrowserSocketTransport.wss) {

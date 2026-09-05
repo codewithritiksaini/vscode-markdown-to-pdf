@@ -1,8 +1,9 @@
 (function() {
   const params = new URLSearchParams(window.location.search);
-  const fileId = params.get('file');
+  const fileId = params.get('file') || '';
+  const token = params.get('token') || '';
   const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-  const wsUri = protocol + window.location.host + '/ws?file=' + encodeURIComponent(fileId);
+  const wsUri = protocol + window.location.host + '/ws?file=' + encodeURIComponent(fileId) + '&token=' + encodeURIComponent(token);
   
   let socket;
   let reconnectDelay = 1000;

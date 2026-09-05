@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import * as vscode from 'vscode';
 import { PipelineStep, GeneratedFile, BrowserLaunchRequest } from './Pipeline';
 import { logger } from '../logger';
 
@@ -12,56 +12,20 @@ export class BrowserLauncherStep implements PipelineStep<GeneratedFile, BrowserL
 }
 
 export class BrowserLauncher {
-    launch(filePath: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const fileUrl = (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('file://'))
-                ? filePath
-                : `file://${filePath}`;
+    async launch(filePath: string): Promise<void> {
+        let uri: vscode.Uri;
+        if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+            uri = vscode.Uri.parse(filePath);
+        } else if (filePath.startsWith('file://')) {
+            uri = vscode.Uri.parse(filePath);
+        } else {
+            uri = vscode.Uri.file(filePath);
+        }
 
-            if (process.platform === 'darwin') {
-                exec(`open "${fileUrl}"`, (err) => err ? reject(err) : resolve());
-                return;
-            }
-
-            if (process.platform === 'win32') {
-                exec(`start "" "${fileUrl}"`, (err) => err ? reject(err) : resolve());
-                return;
-            }
-
-            const browsers = [
-                'google-chrome',
-                'google-chrome-stable',
-                'chromium-browser',
-                'chromium',
-                'firefox',
-                'xdg-open',
-            ];
-
-            const env = { ...process.env, DISPLAY: process.env['DISPLAY'] ?? ':0' };
-
-            function tryNext(index: number): void {
-                if (index >= browsers.length) {
-                    const msg = 'No browser found. Install Chrome or Firefox.';
-                    logger.error(msg);
-                    reject(new Error(msg));
-                    return;
-                }
-
-                const browser = browsers[index];
-                const cmd = `${browser} "${fileUrl}" &`;
-
-                exec(cmd, { env }, (err) => {
-                    if (err) {
-                        logger.info(`Browser "${browser}" not found, trying next…`);
-                        tryNext(index + 1);
-                    } else {
-                        logger.info(`Opened with: ${browser} → ${fileUrl}`);
-                        resolve();
-                    }
-                });
-            }
-
-            tryNext(0);
-        });
+        logger.info(`Opening preview via vscode.env.openExternal: ${uri.toString()}`);
+        const success = await vscode.env.openExternal(uri);
+        if (!success) {
+            logger.warn(`vscode.env.openExternal reported false for ${uri.toString()}`);
+        }
     }
 }

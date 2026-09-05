@@ -1,9 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import { AssetResolverPlugin } from './AssetResolver';
 import { logger } from '../logger';
 
-// Helper to perform regex replacement with an async callback
+// Helper to perform regex replacement with an async callback safely
 async function replaceAsync(
     str: string,
     regex: RegExp,
@@ -21,13 +22,36 @@ async function replaceAsync(
 
 export class LocalImageAssetResolver implements AssetResolverPlugin {
     async resolve(html: string, baseDir: string): Promise<string> {
-        return await replaceAsync(html, /<img([^>]*?)src="([^"]+)"([^>]*?)>/gi, async (_match, before, src, after) => {
-            if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
+        return await replaceAsync(html, /<img([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi, async (_match, before, src, after) => {
+            if (!src || src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
                 return `<img${before}src="${src}"${after}>`;
             }
 
             try {
-                const absPath = path.isAbsolute(src) ? src : path.resolve(baseDir, src);
+                // Strip hash and query parameters, then decode URI components (e.g. %20 -> space)
+                const cleanSrc = decodeURIComponent(src.split('?')[0].split('#')[0]);
+                let absPath: string;
+
+                if (cleanSrc.startsWith('file://')) {
+                    absPath = vscode.Uri.parse(cleanSrc).fsPath;
+                } else if (path.isAbsolute(cleanSrc)) {
+                    absPath = path.normalize(cleanSrc);
+                } else {
+                    absPath = path.resolve(baseDir, cleanSrc);
+                }
+
+                // Security check: restrict image resolution to baseDir or open workspace folders
+                const workspaceRoots = (vscode.workspace.workspaceFolders || []).map((f) => path.resolve(f.uri.fsPath));
+                const allowedRoots = [path.resolve(baseDir), ...workspaceRoots];
+                const isInsideAllowed = allowedRoots.some((root) => {
+                    const rel = path.relative(root, absPath);
+                    return !rel.startsWith('..') && !path.isAbsolute(rel);
+                });
+
+                if (!isInsideAllowed) {
+                    logger.warn(`Security: Blocked local asset resolution outside safe boundaries: ${absPath}`);
+                    return `<img${before}src="${src}"${after}>`;
+                }
 
                 try {
                     await fs.promises.access(absPath, fs.constants.F_OK);
@@ -44,6 +68,9 @@ export class LocalImageAssetResolver implements AssetResolverPlugin {
                     gif: 'image/gif',
                     svg: 'image/svg+xml',
                     webp: 'image/webp',
+                    avif: 'image/avif',
+                    bmp: 'image/bmp',
+                    ico: 'image/x-icon',
                 };
                 const mime = mimeMap[ext] ?? 'image/png';
                 
