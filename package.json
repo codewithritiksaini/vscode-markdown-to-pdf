@@ -138,12 +138,14 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "node build.js --production",
+    "clean": "rm -rf dist",
+    "vscode:prepublish": "npm run clean && node build.js --production",
     "compile": "node build.js",
     "compile:tsc": "tsc -p ./ --noEmit",
     "watch": "node build.js --watch",
     "lint": "eslint src --ext ts",
-    "package": "npx vsce package --no-dependencies",
+    "test": "npm run compile:tsc && npm run lint",
+    "package": "npm run clean && npm run vscode:prepublish && npx vsce package --no-dependencies",
     "pretest": "npm run compile"
   },
   "devDependencies": {

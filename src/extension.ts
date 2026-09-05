@@ -136,8 +136,12 @@ export function activate(context: vscode.ExtensionContext): void {
     const watchCustomCSS = () => {
         const getCustomCssPath = () => {
             const rawPath = vscode.workspace.getConfiguration('markdownPdf').get<string>('customCSSPath') || '';
-            if (!rawPath.trim()) return '';
-            if (path.isAbsolute(rawPath)) return rawPath;
+            if (!rawPath.trim()) {
+                return '';
+            }
+            if (path.isAbsolute(rawPath)) {
+                return rawPath;
+            }
             const workspaceFolders = vscode.workspace.workspaceFolders;
             if (workspaceFolders && workspaceFolders.length > 0) {
                 return path.resolve(workspaceFolders[0].uri.fsPath, rawPath);
@@ -197,8 +201,12 @@ export async function deactivate(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function isMarkdownFile(uri?: vscode.Uri, languageId?: string): boolean {
-    if (!uri) return false;
-    if (languageId === 'markdown') return true;
+    if (!uri) {
+        return false;
+    }
+    if (languageId === 'markdown') {
+        return true;
+    }
     const ext = path.extname(uri.fsPath).toLowerCase();
     return ['.md', '.markdown', '.mdown', '.mkd'].includes(ext);
 }
