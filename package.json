@@ -2,7 +2,7 @@
   "name": "markdown-to-pdf",
   "displayName": "Markdown Preview in Browser",
   "description": "Open any Markdown file as a beautifully styled HTML preview in your browser — with Google Fonts, card layout, and Print to PDF support.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "codewithritiksaini",
   "repository": {
     "type": "git",
