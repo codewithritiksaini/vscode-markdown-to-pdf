@@ -354,6 +354,17 @@ tbody tr:hover {
   background: var(--bg-sub);
 }
 
+/* Dark mode: stronger hover contrast on table rows */
+[data-theme="dark"] tbody tr:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) tbody tr:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
 /* ---- Images / HR ---- */
 img {
   max-width: 100%;

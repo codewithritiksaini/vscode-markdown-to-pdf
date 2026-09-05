@@ -74,7 +74,9 @@ export function bootstrapContainer(extensionPath: string): ServiceContainer {
     const renderer       = new MarkdownRenderer();
     const assetResolver  = new AssetResolver();
     assetResolver.registerPlugin(new LocalImageAssetResolver());
-    const templateStep   = new TemplateStep(new DefaultTemplateEngine(defaultHtmlPath, defaultCssPath));
+    const templateEngine  = new DefaultTemplateEngine(defaultHtmlPath, defaultCssPath);
+    const templateStep    = new TemplateStep(templateEngine);
+    container.register('TemplateEngine', templateEngine);
 
     // 5. Construct transport-layer steps
     const fileManagerStep = new TempFileManagerStep(new TempFileManager());

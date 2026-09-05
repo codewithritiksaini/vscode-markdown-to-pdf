@@ -49,13 +49,80 @@ export class DefaultTemplateEngine implements TemplateEngine {
         };
     }
 
-    /** Wrap every bare &lt;table&gt; in a scroll container div (screen: scroll, print: fixed layout). */
+    /**
+     * Wrap every top-level &lt;table&gt; in a .table-wrapper scroll container.
+     *
+     * Uses a depth-tracking tag scanner instead of a regex so that:
+     *  - Nested &lt;table&gt; elements inside a table do NOT produce double-wrapped
+     *    or mis-split output (a variable-length lookbehind regex would crash V8).
+     *  - The full outer table (from &lt;table to &lt;/table&gt;) is captured correctly.
+     */
     private wrapTables(html: string): string {
-        // Avoid double-wrapping if somehow already wrapped
-        return html.replace(
-            /(?<!<div class="table-wrapper">[\s\S]{0,5})(<table[\s\S]*?<\/table>)/g,
-            '<div class="table-wrapper">$1</div>'
-        );
+        const out: string[] = [];
+        let pos = 0;
+        let depth = 0;
+        let tableStart = -1;
+
+        while (pos < html.length) {
+            const lt = html.indexOf('<', pos);
+            if (lt === -1) {
+                // No more tags — flush remaining content
+                out.push(html.slice(pos));
+                break;
+            }
+
+            // ---- Opening <table[ >] ----
+            if (html.startsWith('<table', lt) && /[\s>/]/.test(html[lt + 6] ?? '')) {
+                if (depth === 0) {
+                    out.push(html.slice(pos, lt)); // content before this table
+                    tableStart = lt;
+                }
+                depth++;
+                const gt = html.indexOf('>', lt);
+                pos = gt === -1 ? lt + 1 : gt + 1;
+                continue;
+            }
+
+            // ---- Closing </table> ----
+            if (html.startsWith('</table>', lt)) {
+                if (depth > 0) {
+                    depth--;
+                    if (depth === 0 && tableStart !== -1) {
+                        const tableEnd = lt + 8; // '</table>'.length
+                        out.push('<div class="table-wrapper">');
+                        out.push(html.slice(tableStart, tableEnd));
+                        out.push('</div>');
+                        tableStart = -1;
+                        pos = tableEnd;
+                        continue;
+                    }
+                }
+                pos = lt + 8;
+                continue;
+            }
+
+            // ---- Any other tag ----
+            const gt = html.indexOf('>', lt);
+            const tagEnd = gt === -1 ? lt + 1 : gt + 1;
+            if (depth === 0) {
+                // Outside a table: push content (text + tag) verbatim
+                out.push(html.slice(pos, tagEnd));
+            }
+            pos = tagEnd;
+        }
+
+        // Unclosed table (shouldn't happen with markdown-it output)
+        if (tableStart !== -1) {
+            out.push(html.slice(tableStart));
+        }
+
+        return out.join('');
+    }
+
+    /** Invalidate the in-memory template cache so the next render re-reads from disk. */
+    public clearTemplateCache(): void {
+        this.cachedHtmlTemplate = null;
+        this.cachedCssTemplate = null;
     }
 
     async build(bodyHtml: string, title: string, customCSS: string): Promise<string> {

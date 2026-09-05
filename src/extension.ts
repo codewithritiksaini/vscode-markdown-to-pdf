@@ -17,6 +17,7 @@ import { MarkdownDocument } from './types';
 import { bootstrapContainer } from './services/bootstrap';
 import { PreviewService } from './services/PreviewService';
 import { BrowserSocketTransport } from './transports/BrowserSocketTransport';
+import { DefaultTemplateEngine } from './services/TemplateEngine';
 
 // ---------------------------------------------------------------------------
 
@@ -111,9 +112,11 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     };
 
-    // Watch configuration changes
+    // Watch configuration changes — also bust the template cache so CSS/HTML
+    // is re-read from disk (important if user updates custom CSS path or themes)
     const changeConfigSubscription = vscode.workspace.onDidChangeConfiguration(async (event) => {
         if (event.affectsConfiguration('markdownPdf')) {
+            container.get<DefaultTemplateEngine>('TemplateEngine')?.clearTemplateCache?.();
             await refreshActivePreviews(undefined, true);
         }
     });
