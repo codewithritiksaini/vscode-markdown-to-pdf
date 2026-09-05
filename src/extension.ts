@@ -124,18 +124,12 @@ export function activate(context: vscode.ExtensionContext): void {
     imageWatcher.onDidCreate((uri) => refreshActivePreviews(uri, true));
     imageWatcher.onDidDelete((uri) => refreshActivePreviews(uri, true));
 
-    // Watch closed documents to clean up preview session state
+    // Watch closed documents: log cleanup without killing active browser session
     const closeDocSubscription = vscode.workspace.onDidCloseTextDocument((document) => {
         if (document.languageId !== 'markdown') {
             return;
         }
-        try {
-            const docUri = document.uri.toString();
-            const previewService = container.get<PreviewService>('PreviewService');
-            previewService.closePreviewSession(docUri);
-        } catch (err) {
-            logger.error('Failed to clean up closed preview session.', err);
-        }
+        logger.info(`Editor closed for document: ${document.uri.toString()}`);
     });
 
     // Watch custom CSS file changes specifically (including those outside workspace)
@@ -202,24 +196,31 @@ export async function deactivate(): Promise<void> {
 // Helpers
 // ---------------------------------------------------------------------------
 
+function isMarkdownFile(uri?: vscode.Uri, languageId?: string): boolean {
+    if (!uri) return false;
+    if (languageId === 'markdown') return true;
+    const ext = path.extname(uri.fsPath).toLowerCase();
+    return ['.md', '.markdown', '.mdown', '.mkd'].includes(ext);
+}
+
 /**
  * Resolves a Uri from the command argument (context-menu click),
  * the active editor, or prompts the user to pick a file.
  */
 async function resolveMarkdownUri(uri?: vscode.Uri): Promise<vscode.Uri | undefined> {
     // Context-menu or editor/title click provides uri directly
-    if (uri && uri.fsPath.endsWith('.md')) {
+    if (uri && isMarkdownFile(uri)) {
         return uri;
     }
 
     // Fallback: active editor
     const activeDoc = vscode.window.activeTextEditor?.document;
-    if (activeDoc && activeDoc.uri.fsPath.endsWith('.md')) {
+    if (activeDoc && (activeDoc.languageId === 'markdown' || isMarkdownFile(activeDoc.uri))) {
         return activeDoc.uri;
     }
 
-    // Fallback: quick-pick from workspace .md files
-    const files = await vscode.workspace.findFiles('**/*.md', '**/node_modules/**', 20);
+    // Fallback: quick-pick from workspace markdown files
+    const files = await vscode.workspace.findFiles('**/*.{md,markdown,mdown,mkd}', '**/node_modules/**', 20);
     if (files.length === 0) {
         vscode.window.showWarningMessage('No Markdown files found in this workspace.');
         return undefined;
@@ -241,18 +242,24 @@ async function resolveMarkdownUri(uri?: vscode.Uri): Promise<vscode.Uri | undefi
 
 async function buildMarkdownDocument(uri: vscode.Uri): Promise<MarkdownDocument> {
     const filePath = uri.fsPath;
+    const openDoc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
 
-    try {
-        await fs.promises.access(filePath, fs.constants.F_OK);
-    } catch {
-        throw new Error(`File not found: ${filePath}`);
+    let source: string;
+    if (openDoc) {
+        source = openDoc.getText();
+    } else if (uri.scheme === 'untitled') {
+        source = '';
+    } else {
+        try {
+            source = await fs.promises.readFile(filePath, 'utf-8');
+        } catch {
+            throw new Error(`File not found or inaccessible: ${filePath}`);
+        }
     }
 
-    // Prefer reading from VS Code's text model (unsaved changes) if open
-    const openDoc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
-    const source = openDoc ? openDoc.getText() : await fs.promises.readFile(filePath, 'utf-8');
-
-    const baseName = path.basename(filePath, path.extname(filePath));
+    const baseName = uri.scheme === 'untitled'
+        ? (openDoc?.fileName || 'Untitled')
+        : (path.basename(filePath, path.extname(filePath)) || 'Untitled');
 
     return { source, filePath, uri, baseName };
 }

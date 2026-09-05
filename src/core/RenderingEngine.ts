@@ -25,7 +25,7 @@ export class DefaultRenderingEngine implements RenderingEngine {
             assets: [],
             metadata: {
                 outline: [],
-                customCSS: '',
+                customCSS: htmlGenerated.customCSS,
                 htmlContent: htmlGenerated.htmlContent,
             },
         };

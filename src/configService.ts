@@ -5,6 +5,7 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import { ExtensionConfig, PdfMargins } from './types';
 import { logger } from './logger';
 
@@ -48,14 +49,22 @@ export class ConfigService {
 
     /** Load custom CSS content from disk if `customCSSPath` is set. */
     async getCustomCSSContent(): Promise<string> {
-        const customPath = this._config.customCSSPath.trim();
-        if (!customPath) { return ''; }
+        const rawPath = this._config.customCSSPath.trim();
+        if (!rawPath) { return ''; }
+
+        let resolvedPath = rawPath;
+        if (!path.isAbsolute(rawPath)) {
+            const folders = vscode.workspace.workspaceFolders;
+            if (folders && folders.length > 0) {
+                resolvedPath = path.resolve(folders[0].uri.fsPath, rawPath);
+            }
+        }
 
         try {
-            await fs.promises.access(customPath, fs.constants.F_OK);
-            return await fs.promises.readFile(customPath, 'utf-8');
+            await fs.promises.access(resolvedPath, fs.constants.F_OK);
+            return await fs.promises.readFile(resolvedPath, 'utf-8');
         } catch (err) {
-            logger.error(`Failed to read custom CSS from "${customPath}".`, err);
+            logger.error(`Failed to read custom CSS from "${resolvedPath}".`, err);
             return '';
         }
     }

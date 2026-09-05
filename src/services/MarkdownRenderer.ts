@@ -1,6 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import taskLists from 'markdown-it-task-lists';
 import anchor from 'markdown-it-anchor';
+import hljs from 'highlight.js';
 import { PipelineStep, RenderedDocument } from './Pipeline';
 import { MarkdownDocument } from '../types';
 
@@ -14,11 +15,15 @@ export class MarkdownRenderer implements PipelineStep<MarkdownDocument, Rendered
             typographer: true,
             breaks: false,
             highlight: (str: string, lang: string): string => {
-                const escaped = str
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;');
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        const highlighted = hljs.highlight(str, { language: lang, ignoreIllegals: true }).value;
+                        return `<pre class="hljs"><code class="language-${lang}">${highlighted}</code></pre>`;
+                    } catch {
+                        // ignore and fall back
+                    }
+                }
+                const escaped = this.md.utils.escapeHtml(str);
                 return `<pre class="hljs"><code class="language-${lang || 'plaintext'}">${escaped}</code></pre>`;
             },
         });

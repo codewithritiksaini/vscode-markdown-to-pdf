@@ -24,10 +24,10 @@ export class PreviewService {
             let transportResult: any;
 
             try {
-                transportResult = await this.transport.send(renderResult);
+                transportResult = await this.transport.send(renderResult, true);
             } catch (err) {
                 logger.warn(`Primary transport failed, falling back to file transport: ${err}`);
-                transportResult = await this.fallbackTransport.send(renderResult);
+                transportResult = await this.fallbackTransport.send(renderResult, true);
             }
 
             this.eventBus.publish('preview:finished', {

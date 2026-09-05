@@ -8,10 +8,11 @@ export class BrowserFileTransport implements Transport {
         private readonly launcher: PipelineStep<GeneratedFile, any>
     ) {}
 
-    async send(result: RenderResult): Promise<string> {
+    async send(result: RenderResult, _forceLaunch?: boolean): Promise<string> {
         const htmlGenerated: GeneratedHtml = {
             document: result.document,
             htmlContent: result.metadata.htmlContent,
+            customCSS: result.metadata.customCSS || '',
         };
 
         const fileGenerated = await this.fileManager.execute(htmlGenerated);

@@ -21,6 +21,7 @@ export interface ResolvedAssetsDocument {
 export interface GeneratedHtml {
     readonly document: MarkdownDocument;
     readonly htmlContent: string;
+    readonly customCSS: string;
 }
 
 export interface GeneratedFile {

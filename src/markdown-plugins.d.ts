@@ -45,3 +45,8 @@ declare module 'markdown-it-anchor' {
     function anchor(md: MarkdownIt, options?: AnchorOptions): void;
     export = anchor;
 }
+
+declare module '*.css' {
+    const content: string;
+    export default content;
+}

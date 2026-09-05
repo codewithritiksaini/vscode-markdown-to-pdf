@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import { PipelineStep, ResolvedAssetsDocument, GeneratedHtml } from './Pipeline';
 import { configService } from '../configService';
+import { getHighlightThemeCss } from './ThemeService';
 
 export interface TemplateEngine {
     build(bodyHtml: string, title: string, customCSS: string): Promise<string>;
@@ -22,7 +23,7 @@ export class TemplateStep implements PipelineStep<ResolvedAssetsDocument, Genera
         const customCSS = await configService.getCustomCSSContent();
         const htmlContent = await this.engine.build(input.html, input.document.baseName, customCSS);
 
-        return { document: input.document, htmlContent };
+        return { document: input.document, htmlContent, customCSS };
     }
 }
 
@@ -37,9 +38,29 @@ export class DefaultTemplateEngine implements TemplateEngine {
         const cssTemplate = await fs.promises.readFile(this.cssTemplatePath, 'utf-8');
         const safeTitle = escapeHtml(title);
 
+        const config = configService.get();
+        const themeCss = getHighlightThemeCss(config.highlightTheme);
+        const margins = config.margins || { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' };
+        const pageSize = config.pageSize || 'A4';
+        const hideHeaderCss = config.includeHeaderFooter ? '' : '.page-header { display: none !important; }';
+
+        const printPageCss = `
+${themeCss}
+
+@media print {
+  @page {
+    size: ${pageSize};
+    margin: ${margins.top} ${margins.right} ${margins.bottom} ${margins.left};
+  }
+  ${hideHeaderCss}
+}
+`;
+
+        const combinedStyle = `${cssTemplate}\n${printPageCss}`;
+
         return htmlTemplate
             .replace(/\{\{TITLE\}\}/g, () => safeTitle)
-            .replace(/\{\{STYLE\}\}/g, () => cssTemplate)
+            .replace(/\{\{STYLE\}\}/g, () => combinedStyle)
             .replace(/\{\{CUSTOM_CSS\}\}/g, () => customCSS)
             .replace(/\{\{BODY\}\}/g, () => bodyHtml);
     }

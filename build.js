@@ -15,7 +15,8 @@ esbuild.build({
     sourcemap: !production,
     minify: production,
     treeShaking: true,
-    // puppeteer-core uses dynamic require internally — mark binary as external
-    // but the JS layer is bundled fine.
+    loader: {
+        '.css': 'text',
+    },
     logLevel: 'info',
 }).catch(() => process.exit(1));

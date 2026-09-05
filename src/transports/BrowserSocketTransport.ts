@@ -279,7 +279,7 @@ export class BrowserSocketTransport implements Transport {
         return BrowserSocketTransport.serverStartedPromise;
     }
 
-    async send(result: RenderResult): Promise<void> {
+    async send(result: RenderResult, forceLaunch: boolean = false): Promise<void> {
         const fileId = result.document.uri.toString();
 
         // 1. Update the caches and ensure security token exists
@@ -317,9 +317,9 @@ export class BrowserSocketTransport implements Transport {
         // 3. Await server port resolution
         const port = await BrowserSocketTransport.ensureServerStarted();
 
-        // 4. Launch default browser session once
-        if (!BrowserSocketTransport.openedFiles.has(fileId)) {
-            logger.info(`Preview session created for: ${fileId}`);
+        // 4. Launch default browser session once or when forceLaunch is requested
+        if (forceLaunch || !BrowserSocketTransport.openedFiles.has(fileId)) {
+            logger.info(`Launching browser preview session for: ${fileId} (forceLaunch: ${forceLaunch})`);
             BrowserSocketTransport.openedFiles.add(fileId);
             const previewUrl = `http://127.0.0.1:${port}/?file=${encodeURIComponent(fileId)}&token=${encodeURIComponent(token)}`;
             await this.launcher.launch(previewUrl);
